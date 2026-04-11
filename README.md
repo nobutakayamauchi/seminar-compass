@@ -52,3 +52,30 @@ It then restructures the content into a learner-friendly format for:
 - retrieval-based review instead of passive rereading
 - no unsupported factual supplementation
 - clear separation between original content and supplemental support
+
+## MVP implementation status
+Current code implements a minimal reconstruction pipeline in `seminar_compass/`:
+- Current active user flow: raw text input (URL/media ingestion intentionally deferred in this step)
+- Source tracking with `source_kind`: `url_text | raw_text | transcript | uploaded_support | extracted_article`
+- Reconstruction outputs with explicit `output_type`: `base | preview | review | easier`
+- Recomposition modes are intentionally limited to exactly: `preview`, `review`, `easier`
+- Support-material handling is separated via `supplemental_explanation`
+
+Run tests:
+
+```bash
+python -m pytest -q
+```
+
+
+## Minimal user-facing entrypoint (raw text)
+Run the raw-text MVP flow and print an inspectable result view:
+
+```bash
+python -m seminar_compass.cli --text "Your learning content here."
+```
+
+Optional:
+- `--text-file path/to/input.txt`
+- `--support-file path/to/support1.txt --support-file path/to/support2.txt`
+- `--mode base|preview|review|easier`
