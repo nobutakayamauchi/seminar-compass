@@ -18,10 +18,17 @@ EXAMPLE_RAW_TEXT = (
 )
 
 MODE_HELP = {
-    OutputType.BASE: "Base = faithful structured extraction from primary source content.",
-    OutputType.PREVIEW: "Preview = quickest orientation before full consumption.",
-    OutputType.REVIEW: "Review = retrieval-focused prompts for reactivation.",
-    OutputType.EASIER: "Easier = simpler phrasing without changing facts.",
+    OutputType.BASE: "Faithful structured extraction from primary source content.",
+    OutputType.PREVIEW: "Fast orientation before full consumption.",
+    OutputType.REVIEW: "Retrieval-focused prompts for reactivation.",
+    OutputType.EASIER: "Simpler phrasing without changing facts.",
+}
+
+MODE_WHEN_TO_USE = {
+    OutputType.BASE: "Use when you need the standard full reconstruction first.",
+    OutputType.PREVIEW: "Use before committing time to the full source.",
+    OutputType.REVIEW: "Use after first pass to strengthen recall and next action.",
+    OutputType.EASIER: "Use when wording feels too dense and you need a simpler pass.",
 }
 
 
@@ -86,10 +93,14 @@ def raw_text_result_page(
         else "<p>None provided.</p>"
     )
 
-    mode_cards = "".join(
+    mode_rows = "".join(
         (
-            f"<li><strong>{escape(mode.value)}</strong>: {escape(MODE_HELP[mode])}<br />"
-            f"Summary: {escape(output_by_type[mode].reconstructed_summary)}</li>"
+            "<tr>"
+            f"<td><strong>{escape(mode.value)}</strong></td>"
+            f"<td>{escape(MODE_HELP[mode])}</td>"
+            f"<td>{escape(MODE_WHEN_TO_USE[mode])}</td>"
+            f"<td>{escape(output_by_type[mode].reconstructed_summary)}</td>"
+            "</tr>"
         )
         for mode in [OutputType.BASE, OutputType.PREVIEW, OutputType.REVIEW, OutputType.EASIER]
     )
@@ -106,7 +117,17 @@ def raw_text_result_page(
     <p><a href=\"/\">← Back to input</a></p>
 
     <h2>Mode differences (quick view)</h2>
-    <ul>{mode_cards}</ul>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Mode</th>
+          <th>What it is</th>
+          <th>When to use</th>
+          <th>Summary output</th>
+        </tr>
+      </thead>
+      <tbody>{mode_rows}</tbody>
+    </table>
 
     <h2>Top 3 takeaways</h2>
     {_list_html(base_output.top_takeaways)}
