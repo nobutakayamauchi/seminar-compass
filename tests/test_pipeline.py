@@ -1,5 +1,5 @@
 from seminar_compass import InputType, ReconstructionRequest, SeminarCompassPipeline
-from seminar_compass.models import OutputType, SourceKind
+from seminar_compass.models import EvidenceReference, OutputType, SourceKind
 
 
 def test_reconstruction_generates_expected_output_types():
@@ -28,3 +28,24 @@ def test_primary_source_kind_tracks_input_type():
 
     doc = pipeline._build_primary_doc(request)
     assert doc.source_kind == SourceKind.TRANSCRIPT
+
+
+def test_derived_outputs_keep_evidence_reference_type():
+    pipeline = SeminarCompassPipeline()
+    request = ReconstructionRequest(
+        input_type=InputType.RAW_TEXT,
+        content="Main claim. Supporting detail.",
+    )
+
+    response = pipeline.reconstruct(request)
+    for output in response.primary_outputs:
+        assert output.source_references
+        assert isinstance(output.source_references[0], EvidenceReference)
+
+
+def test_clean_text_preserves_paragraph_breaks():
+    pipeline = SeminarCompassPipeline()
+
+    cleaned = pipeline._clean_text("One line.\ncontinued.\n\nSecond paragraph.\n\n\nThird paragraph.")
+
+    assert cleaned == "One line. continued.\nSecond paragraph.\nThird paragraph."
