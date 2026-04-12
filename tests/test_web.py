@@ -27,11 +27,15 @@ def test_result_page_shows_mode_differences_and_preserves_sections():
 
     assert response.status_code == 200
     assert "Mode differences (quick view)" in response.text
+    assert "When to use" in response.text
+    assert "Summary output" in response.text
     assert "<strong>base</strong>" in response.text
     assert "<strong>preview</strong>" in response.text
     assert "<strong>review</strong>" in response.text
     assert "<strong>easier</strong>" in response.text
+    assert "Use before committing time to the full source." in response.text
 
+    # Existing base output sections remain present.
     assert "Top 3 takeaways" in response.text
     assert "Main claim" in response.text
     assert "Conditions / assumptions" in response.text
