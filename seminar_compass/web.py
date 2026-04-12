@@ -11,10 +11,23 @@ from seminar_compass.pipeline import SeminarCompassPipeline
 app = FastAPI(title="Seminar Compass MVP")
 pipeline = SeminarCompassPipeline()
 
+EXAMPLE_RAW_TEXT = (
+    "The main claim is that short daily retrieval improves long-term retention. "
+    "If the material is new or dense, first do a 2-minute preview before deep study. "
+    "Example: after a seminar, write three recall bullets and one next action."
+)
+
+MODE_HELP = {
+    OutputType.BASE: "Base = faithful structured extraction from primary source content.",
+    OutputType.PREVIEW: "Preview = quickest orientation before full consumption.",
+    OutputType.REVIEW: "Review = retrieval-focused prompts for reactivation.",
+    OutputType.EASIER: "Easier = simpler phrasing without changing facts.",
+}
+
 
 @app.get("/", response_class=HTMLResponse)
 def raw_text_input_page() -> str:
-    return """
+    return f"""
 <!doctype html>
 <html lang=\"en\">
   <head>
@@ -26,7 +39,13 @@ def raw_text_input_page() -> str:
     <p>Raw-text reconstruction MVP.</p>
     <form method=\"post\" action=\"/raw-text\">
       <label for=\"content\">Paste raw text</label><br />
-      <textarea id=\"content\" name=\"content\" rows=\"16\" cols=\"100\" required></textarea><br />
+      <textarea id=\"content\" name=\"content\" rows=\"16\" cols=\"100\" required>{escape(EXAMPLE_RAW_TEXT)}</textarea><br />
+      <p><small>Quick start: edit this example text, then click Reconstruct.</small></p>
+
+      <label for=\"support_materials\">Optional support material (separate from primary outputs)</label><br />
+      <textarea id=\"support_materials\" name=\"support_materials\" rows=\"6\" cols=\"100\" placeholder=\"Optional: paste support notes or references. Use a line with --- to separate multiple supports.\"></textarea><br />
+      <p><small>Guidance: support material is used only for supplemental explanation and kept separate from primary reconstruction output.</small></p>
+
       <button type=\"submit\">Reconstruct</button>
     </form>
   </body>
@@ -38,19 +57,41 @@ def _list_html(items: list[str]) -> str:
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
 
 
+def _parse_support_materials(raw: str | None) -> list[str]:
+    if raw is None:
+        return []
+
+    chunks = [chunk.strip() for chunk in raw.split("\n---\n")]
+    return [chunk for chunk in chunks if chunk]
+
+
 @app.post("/raw-text", response_class=HTMLResponse)
-def raw_text_result_page(content: str = Form(...)) -> str:
+def raw_text_result_page(
+    content: str = Form(...), support_materials: str | None = Form(default=None)
+) -> str:
     response = pipeline.reconstruct(
-        ReconstructionRequest(input_type=InputType.RAW_TEXT, content=content)
+        ReconstructionRequest(
+            input_type=InputType.RAW_TEXT,
+            content=content,
+            support_materials=_parse_support_materials(support_materials),
+        )
     )
-    base_output = next(
-        output for output in response.primary_outputs if output.output_type == OutputType.BASE
-    )
+
+    output_by_type = {output.output_type: output for output in response.primary_outputs}
+    base_output = output_by_type[OutputType.BASE]
 
     supplemental = (
         f"<p>{escape(base_output.supplemental_explanation)}</p>"
         if base_output.supplemental_explanation
         else "<p>None provided.</p>"
+    )
+
+    mode_cards = "".join(
+        (
+            f"<li><strong>{escape(mode.value)}</strong>: {escape(MODE_HELP[mode])}<br />"
+            f"Summary: {escape(output_by_type[mode].reconstructed_summary)}</li>"
+        )
+        for mode in [OutputType.BASE, OutputType.PREVIEW, OutputType.REVIEW, OutputType.EASIER]
     )
 
     return f"""
@@ -63,6 +104,9 @@ def raw_text_result_page(content: str = Form(...)) -> str:
   <body>
     <h1>Reconstruction Result</h1>
     <p><a href=\"/\">← Back to input</a></p>
+
+    <h2>Mode differences (quick view)</h2>
+    <ul>{mode_cards}</ul>
 
     <h2>Top 3 takeaways</h2>
     {_list_html(base_output.top_takeaways)}
