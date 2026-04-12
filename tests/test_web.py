@@ -14,6 +14,9 @@ def test_input_page_has_example_and_support_guidance():
     assert response.status_code == 200
     assert "Quick start: edit this example text" in response.text
     assert "Optional support material (separate from primary outputs)" in response.text
+    assert "Internal beta scope" in response.text
+    assert "Supported now:" in response.text
+    assert "Not supported yet:" in response.text
 
 
 def test_result_page_shows_mode_differences_and_preserves_sections():
