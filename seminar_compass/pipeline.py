@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import replace
 import re
 import uuid
 from typing import Iterable, List
@@ -144,27 +144,31 @@ class SeminarCompassPipeline:
         )
 
     def _build_preview_output(self, base: ReconstructionOutput) -> ReconstructionOutput:
-        payload = asdict(base)
-        payload["output_type"] = OutputType.PREVIEW
-        payload["reconstructed_summary"] = f"Preview: {base.main_claim}"
-        payload["retrieval_questions"] = base.retrieval_questions[:2]
-        return ReconstructionOutput(**payload)
+        return replace(
+            base,
+            output_type=OutputType.PREVIEW,
+            reconstructed_summary=f"Preview: {base.main_claim}",
+            retrieval_questions=base.retrieval_questions[:2],
+        )
 
     def _build_review_output(self, base: ReconstructionOutput) -> ReconstructionOutput:
-        payload = asdict(base)
-        payload["output_type"] = OutputType.REVIEW
-        payload["reconstructed_summary"] = "Review mode: recall key claim, condition, and next action."
-        payload["retrieval_questions"] = base.retrieval_questions + [
-            "Restate the main claim in one sentence.",
-            "What is your next action?",
-        ]
-        return ReconstructionOutput(**payload)
+        return replace(
+            base,
+            output_type=OutputType.REVIEW,
+            reconstructed_summary="Review mode: recall key claim, condition, and next action.",
+            retrieval_questions=base.retrieval_questions
+            + [
+                "Restate the main claim in one sentence.",
+                "What is your next action?",
+            ],
+        )
 
     def _build_easier_output(self, base: ReconstructionOutput) -> ReconstructionOutput:
-        payload = asdict(base)
-        payload["output_type"] = OutputType.EASIER
-        payload["reconstructed_summary"] = f"In simple terms: {base.main_claim}"
-        return ReconstructionOutput(**payload)
+        return replace(
+            base,
+            output_type=OutputType.EASIER,
+            reconstructed_summary=f"In simple terms: {base.main_claim}",
+        )
 
     @staticmethod
     def _build_support_explanation(support_docs: List[SourceDocument]) -> str:
@@ -175,7 +179,9 @@ class SeminarCompassPipeline:
 
     @staticmethod
     def _clean_text(text: str) -> str:
-        return re.sub(r"\s+", " ", text).strip()
+        paragraphs = re.split(r"\n\s*\n+", text.strip())
+        cleaned = [re.sub(r"\s+", " ", p).strip() for p in paragraphs if p.strip()]
+        return "\n".join(cleaned)
 
     @staticmethod
     def _extract_conditions(sentences: List[str]) -> List[str]:
