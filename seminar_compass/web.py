@@ -44,6 +44,12 @@ def raw_text_input_page() -> str:
   <body>
     <h1>Seminar Compass</h1>
     <p>Raw-text reconstruction MVP.</p>
+    <section>
+      <h2>Internal beta scope</h2>
+      <p><strong>Stable primary path:</strong> raw-text reconstruction via this form.</p>
+      <p><strong>Supported now:</strong> raw text, simple URL-to-text extraction, mode comparison, support-material separation.</p>
+      <p><strong>Not supported yet:</strong> embedded-video handling, media transcription, advanced ingestion.</p>
+    </section>
     <form method=\"post\" action=\"/raw-text\">
       <label for=\"content\">Paste raw text</label><br />
       <textarea id=\"content\" name=\"content\" rows=\"16\" cols=\"100\" required>{escape(EXAMPLE_RAW_TEXT)}</textarea><br />
