@@ -107,14 +107,7 @@ class SeminarCompassPipeline:
         if not sentences:
             sentences = ["No sufficient primary-content evidence was found."]
 
-        top_takeaways = [
-            self._bounded_text(
-                lambda sentence=sentence: sentence,
-                self.TAKEAWAY_ITEM_CAP,
-                "Takeaway could not be compressed cleanly.",
-            )
-            for sentence in (sentences[:3] + ["N/A"] * max(0, 3 - len(sentences)))
-        ]
+        top_takeaways = self._build_top_takeaways(sentences)
         claim = self._bounded_text(
             lambda: sentences[0],
             self.MAIN_CLAIM_CAP,
@@ -242,6 +235,30 @@ class SeminarCompassPipeline:
             "Under what conditions does the claim hold?",
             f"How would you apply this claim: '{main_claim[:100]}'?",
         ]
+
+    def _build_top_takeaways(self, sentences: List[str]) -> List[str]:
+        takeaways: List[str] = []
+        for sentence in sentences:
+            trimmed = self._trim_to_two_sentences(sentence)
+            if not trimmed:
+                continue
+            compact = self._bounded_text(
+                lambda value=trimmed: value,
+                self.TAKEAWAY_ITEM_CAP,
+                "Takeaway could not be compressed cleanly.",
+            )
+            if compact not in takeaways:
+                takeaways.append(compact)
+            if len(takeaways) == 3:
+                break
+        return takeaways or ["Takeaway could not be compressed cleanly."]
+
+    @staticmethod
+    def _trim_to_two_sentences(text: str) -> str:
+        sentence_parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        if sentence_parts:
+            return " ".join(sentence_parts[:2])
+        return text.strip()
 
     @staticmethod
     def _apply_cap(text: str, cap: int) -> str:
