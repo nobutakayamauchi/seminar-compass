@@ -49,3 +49,33 @@ def test_clean_text_preserves_paragraph_breaks():
     cleaned = pipeline._clean_text("One line.\ncontinued.\n\nSecond paragraph.\n\n\nThird paragraph.")
 
     assert cleaned == "One line. continued.\nSecond paragraph.\nThird paragraph."
+
+
+def test_main_claim_is_limited_to_three_sentences():
+    pipeline = SeminarCompassPipeline()
+    request = ReconstructionRequest(
+        input_type=InputType.RAW_TEXT,
+        content="A first core claim. A second supporting claim. A third nuance. A fourth extra point.",
+    )
+
+    response = pipeline.reconstruct(request)
+    base = next(out for out in response.primary_outputs if out.output_type == OutputType.BASE)
+
+    assert "A first core claim." in base.main_claim
+    assert "A second supporting claim." in base.main_claim
+    assert "A third nuance." in base.main_claim
+    assert "A fourth extra point." not in base.main_claim
+    assert base.main_claim.count(".") + base.main_claim.count("!") + base.main_claim.count("?") <= 3
+
+
+def test_main_claim_is_clipped_for_single_long_sentence():
+    pipeline = SeminarCompassPipeline()
+    request = ReconstructionRequest(
+        input_type=InputType.RAW_TEXT,
+        content="A" * 1000,
+    )
+
+    response = pipeline.reconstruct(request)
+    base = next(out for out in response.primary_outputs if out.output_type == OutputType.BASE)
+
+    assert len(base.main_claim) <= pipeline.MAIN_CLAIM_MAX_CHARS

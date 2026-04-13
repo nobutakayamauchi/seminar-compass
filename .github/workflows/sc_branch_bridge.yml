@@ -1,0 +1,127 @@
+name: Seminar Compass Branch/PR Bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_name:
+        description: Task name (used for branch + commit)
+        required: true
+        type: string
+      allowed_files:
+        description: Allowed files (comma or newline separated)
+        required: true
+        type: string
+      change_mode:
+        description: Change mode
+        required: true
+        type: choice
+        options:
+          - full_file_replace
+          - patch
+      target_files_payload:
+        description: JSON payload for apply operation
+        required: true
+        type: string
+      pr_title:
+        description: Pull request title
+        required: true
+        type: string
+      pr_body:
+        description: Pull request body
+        required: true
+        type: string
+      dry_run:
+        description: Validate only; do not push or open PR
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  branch-pr-bridge:
+    runs-on: ubuntu-latest
+    outputs:
+      branch_name: ${{ steps.bridge.outputs.branch_name }}
+      base_main_sha: ${{ steps.bridge.outputs.base_main_sha }}
+      commit_hash: ${{ steps.bridge.outputs.commit_hash }}
+      changed_files: ${{ steps.bridge.outputs.changed_files }}
+      manifest_path: ${{ steps.bridge.outputs.manifest_path }}
+      pr_url: ${{ steps.create_pr.outputs.pr_url }}
+      dry_run: ${{ steps.bridge.outputs.dry_run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Resolve latest main SHA
+        id: resolve_main
+        run: |
+          set -euo pipefail
+          git fetch origin main --prune
+          BASE_SHA="$(git rev-parse origin/main)"
+          echo "base_main_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Run branch bridge
+        id: bridge
+        env:
+          TARGET_FILES_PAYLOAD: ${{ inputs.target_files_payload }}
+        run: |
+          set -euo pipefail
+          python3 scripts/sc_branch_bridge.py \
+            --task-name "${{ inputs.task_name }}" \
+            --allowed-files "${{ inputs.allowed_files }}" \
+            --change-mode "${{ inputs.change_mode }}" \
+            --target-files-payload "$TARGET_FILES_PAYLOAD" \
+            --pr-title "${{ inputs.pr_title }}" \
+            --pr-body "${{ inputs.pr_body }}" \
+            --dry-run "${{ inputs.dry_run }}" \
+            --base-main-sha "${{ steps.resolve_main.outputs.base_main_sha }}"
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-branch-bridge-manifest
+          path: ${{ steps.bridge.outputs.manifest_path }}
+
+      - name: Push fresh branch
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          git push --set-upstream origin "${{ steps.bridge.outputs.branch_name }}"
+
+      - name: Create PR
+        if: ${{ inputs.dry_run == false }}
+        id: create_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "${{ steps.bridge.outputs.branch_name }}" \
+            --title "${{ inputs.pr_title }}" \
+            --body "${{ inputs.pr_body }}
+
+Task: ${{ inputs.task_name }}
+Allowed files: ${{ inputs.allowed_files }}
+Changed files: ${{ steps.bridge.outputs.changed_files }}
+Manifest: ${{ steps.bridge.outputs.manifest_path }}")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Job summary
+        run: |
+          {
+            echo "## Seminar Compass Branch/PR Bridge Result"
+            echo "- Branch: \\`${{ steps.bridge.outputs.branch_name }}\\`"
+            echo "- Base main SHA: \\`${{ steps.bridge.outputs.base_main_sha }}\\`"
+            echo "- Commit hash: \\`${{ steps.bridge.outputs.commit_hash || 'N/A (dry run)' }}\\`"
+            echo "- PR URL: ${{ steps.create_pr.outputs.pr_url || 'N/A (dry run)' }}"
+            echo "- Changed files: \\`${{ steps.bridge.outputs.changed_files }}\\`"
+            echo "- Manifest: \\`${{ steps.bridge.outputs.manifest_path }}\\`"
+            echo "- Dry run: \\`${{ steps.bridge.outputs.dry_run }}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
