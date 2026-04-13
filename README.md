@@ -61,8 +61,45 @@ Current code implements a minimal reconstruction pipeline in `seminar_compass/`:
 - Recomposition modes are intentionally limited to exactly: `preview`, `review`, `easier`
 - Support-material handling is separated via `supplemental_explanation`
 
-Run tests:
+## Run tests
 
 ```bash
 python -m pytest -q
+```
+
+## Small public beta deployment (FastAPI)
+
+### What this beta supports now
+- Raw-text reconstruction via the web form
+- Simple URL-to-text extraction path in the MVP pipeline
+- Mode comparison across `base`, `preview`, `review`, and `easier`
+- Support-material separation via `supplemental_explanation`
+
+### Not supported yet
+- Embedded-video handling
+- Media transcription
+- Advanced ingestion workflows
+
+### Install
+
+```bash
+pip install -r requirements.txt
+```
+
+### Local run
+
+```bash
+uvicorn seminar_compass.web:app --reload
+```
+
+### Render start command
+
+```bash
+uvicorn seminar_compass.web:app --host 0.0.0.0 --port $PORT
+```
+
+### Railway start command
+
+```bash
+uvicorn seminar_compass.web:app --host 0.0.0.0 --port $PORT
 ```
