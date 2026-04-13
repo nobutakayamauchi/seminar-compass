@@ -108,7 +108,7 @@ class SeminarCompassPipeline:
             sentences = ["No sufficient primary-content evidence was found."]
 
         top_takeaways = sentences[:3] + ["N/A"] * max(0, 3 - len(sentences))
-        claim = sentences[0]
+        claim = self._build_main_claim(sentences)
         conditions = self._extract_conditions(sentences)
         practical = sentences[1] if len(sentences) > 1 else claim
 
@@ -216,3 +216,22 @@ class SeminarCompassPipeline:
             "Under what conditions does the claim hold?",
             f"How would you apply this claim: '{main_claim[:100]}'?",
         ]
+
+    def _build_main_claim(self, sentences: List[str]) -> str:
+        candidate = " ".join(sentences[: self.MAIN_CLAIM_MAX_SENTENCES]).strip()
+        if not candidate:
+            return "Main claim could not be isolated cleanly."
+
+        sentence_parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", candidate) if s.strip()]
+        if sentence_parts:
+            normalized = " ".join(sentence_parts[: self.MAIN_CLAIM_MAX_SENTENCES])
+        else:
+            normalized = candidate
+
+        if len(normalized) > self.MAIN_CLAIM_MAX_CHARS:
+            normalized = normalized[: self.MAIN_CLAIM_MAX_CHARS].rstrip()
+
+        return normalized or "Main claim could not be isolated cleanly."
+
+    MAIN_CLAIM_MAX_SENTENCES = 3
+    MAIN_CLAIM_MAX_CHARS = 220
