@@ -107,10 +107,25 @@ class SeminarCompassPipeline:
         if not sentences:
             sentences = ["No sufficient primary-content evidence was found."]
 
-        top_takeaways = sentences[:3] + ["N/A"] * max(0, 3 - len(sentences))
-        claim = sentences[0]
+        top_takeaways = [
+            self._bounded_text(
+                lambda sentence=sentence: sentence,
+                self.TAKEAWAY_ITEM_CAP,
+                "Takeaway could not be compressed cleanly.",
+            )
+            for sentence in (sentences[:3] + ["N/A"] * max(0, 3 - len(sentences)))
+        ]
+        claim = self._bounded_text(
+            lambda: sentences[0],
+            self.MAIN_CLAIM_CAP,
+            "Main claim could not be isolated cleanly.",
+        )
         conditions = self._extract_conditions(sentences)
-        practical = sentences[1] if len(sentences) > 1 else claim
+        practical = self._bounded_text(
+            lambda: (sentences[1] if len(sentences) > 1 else claim),
+            self.PRACTICAL_TAKEAWAY_ITEM_CAP,
+            "Practical takeaway could not be compressed cleanly.",
+        )
 
         refs = [
             EvidenceReference(
@@ -133,7 +148,13 @@ class SeminarCompassPipeline:
             conditions_assumptions=conditions,
             practical_takeaway=practical,
             prerequisite_knowledge=self._extract_prerequisites(joined),
-            what_to_watch_read_first=[claim],
+            what_to_watch_read_first=[
+                self._bounded_text(
+                    lambda: claim,
+                    self.WHAT_TO_CONSUME_FIRST_CAP,
+                    "What to consume first could not be isolated cleanly.",
+                )
+            ],
             safely_skippable_parts=self._extract_skippable(sentences),
             original_order_summary=" ".join(sentences[:5]),
             reconstructed_summary=self._reconstruct(sentences),
@@ -144,10 +165,15 @@ class SeminarCompassPipeline:
         )
 
     def _build_preview_output(self, base: ReconstructionOutput) -> ReconstructionOutput:
+        preview_summary = self._bounded_text(
+            lambda: f"Preview: {base.main_claim}",
+            self.PREVIEW_CAP,
+            "Preview could not be compressed cleanly.",
+        )
         return replace(
             base,
             output_type=OutputType.PREVIEW,
-            reconstructed_summary=f"Preview: {base.main_claim}",
+            reconstructed_summary=preview_summary,
             retrieval_questions=base.retrieval_questions[:2],
         )
 
@@ -216,3 +242,41 @@ class SeminarCompassPipeline:
             "Under what conditions does the claim hold?",
             f"How would you apply this claim: '{main_claim[:100]}'?",
         ]
+
+    @staticmethod
+    def _apply_cap(text: str, cap: int) -> str:
+        if len(text) <= cap:
+            return text
+        return text[:cap].rstrip()
+
+    def _bounded_text(
+        self, generate_fn, cap: int, fallback: str
+    ) -> str:
+        generated = generate_fn() or ""
+        if not generated.strip():
+            return fallback if len(fallback) <= cap else self._apply_cap(fallback, cap)
+        if len(generated) <= cap:
+            return generated
+
+        repaired = self._repair_short(generated, cap)
+        if len(repaired) <= cap:
+            return repaired
+
+        if len(fallback) <= cap:
+            return fallback
+
+        return self._apply_cap(repaired, cap)
+
+    @staticmethod
+    def _repair_short(text: str, cap: int) -> str:
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        if sentences:
+            candidate = sentences[0]
+            if len(candidate) <= cap:
+                return candidate
+        return SeminarCompassPipeline._apply_cap(text, cap)
+    PREVIEW_CAP = 280
+    MAIN_CLAIM_CAP = 140
+    WHAT_TO_CONSUME_FIRST_CAP = 120
+    TAKEAWAY_ITEM_CAP = 80
+    PRACTICAL_TAKEAWAY_ITEM_CAP = 60
